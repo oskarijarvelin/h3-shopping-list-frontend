@@ -1,16 +1,46 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Container, Row, Col, Spinner, Form, Button } from 'react-bootstrap';
 import { XCircle } from 'react-bootstrap-icons';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
-function AddToList() {
+const url = 'http://localhost/h3-shopping-list-backend/';
+
+function AddToList({items, setItems}) {
   const [name, setName] = useState('');
   const [amount, setAmount] = useState(1);
 
   function addToList(e) {
     e.preventDefault();
-    alert(amount + ' x ' + name);
+    let status = 0;
+
+    fetch(url + 'add.php', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        description: name,
+        amount: amount
+      })
+    })
+    .then(res => {
+      status = parseInt(res.status);
+      return res.json();
+    })
+    .then(
+      (res) => {
+        if (status === 200) {
+          setItems(items => [...items, res]);
+        } else {
+          alert(res.error);
+        }
+      }, (error) => {
+        alert(error);
+      }
+    )
+
     setAmount(1);
     setName('');
   }
@@ -38,11 +68,59 @@ function AddToList() {
 }
 
 function App() {
-  var shoppingList = [
-    ['Milk', 4],
-    ['Coffee', 1],
-    ['Eggs', 12]
-  ];
+  const [items, setItems] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  let status = 0;
+
+  useEffect(() => {
+    fetch(url + 'index.php')
+    .then(response => {
+      status = response.status;
+      return response.json();
+    })
+    .then(
+      (response) => {
+        if (status === 200) {
+          setItems(response);
+          setIsLoading(false);
+        } else {
+          alert(response.error);
+        }
+      }, (error) => {
+        alert(error);
+      }
+    )
+  }, [url, status])
+
+  function deleteFromList(id) {
+    let status = 0;
+    fetch(url + 'delete.php', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        id: id
+      })
+    })
+    .then(res => {
+      status = parseInt(res.status);
+      return res.json();
+    })
+    .then(
+      (res) => {
+        if (status === 200) {
+          const updatedList = items.filter((item) => item.id !== id);
+          setItems(updatedList);
+        } else {
+          alert(res.error);
+        }
+      }, (error) => {
+        alert(error);
+      }
+    )
+  }
 
   return (
     <div className="App py-5">
@@ -56,44 +134,45 @@ function App() {
 
         <Row className="pt-4 pb-5 mb-5">
           <Col lg={6}>
-            { false &&
+            {isLoading === true &&
               <div className="d-flex align-items-center">
                 <Spinner animation="border" />
                 <p className="lead pl-3 m-0">Loading...</p>
               </div>
             }
             
-            <div className="border mw-100">
-              <Row className="bg-light mw-100 mx-auto">
-                <Col sm={8} className="border-right p-2 border-bottom">
-                  <b>Name</b>
-                </Col>
-                <Col sm={2} className="text-center border-right p-2 border-bottom">
-                  <b>Pcs.</b>
-                </Col>
-                <Col sm={2} className="border-bottom"></Col>
-              </Row>
+            {isLoading === false &&
+              <div className="border mw-100">
+                <Row className="bg-light mw-100 mx-auto">
+                  <Col sm={8} className="border-right p-2 border-bottom">
+                    <b>Name</b>
+                  </Col>
+                  <Col sm={2} className="text-center border-right p-2 border-bottom">
+                    <b>Pcs.</b>
+                  </Col>
+                  <Col sm={2} className="border-bottom"></Col>
+                </Row>
 
-              {shoppingList.map((row, i) => {
-                return (
-                  <Row className={( (i % 2) === 1 ) ? 'bg-light mw-100 mx-auto shopping-list-row' : 'mw-100 mx-auto shopping-list-row'} key={i} >
-                    {row.map((item, j) => {
-                      return (
-                        <Col key={j} sm={(j % 2 === 1) ? 2 : 8} className={(j % 2 === 1) ? 'text-center border-right p-2' : 'border-right p-2'}>
-                          {item}
-                        </Col>
-                      )
-                    })}
-                    <Col className="text-center p-2" sm={2}>
-                      <XCircle style={{cursor: "pointer"}} />
-                    </Col>
-                  </Row>
-                )
-              })}
-            </div>
+                {items.map((item, i) => {
+                  return (
+                    <Row className={( (i % 2) === 1 ) ? 'bg-light mw-100 mx-auto shopping-list-row' : 'mw-100 mx-auto shopping-list-row'} key={i} >
+                      <Col sm={8} className="border-right p-2">
+                        {item.description}
+                      </Col>
+                      <Col sm={2} className="border-right text-center p-2">
+                        {item.amount}
+                      </Col>
+                      <Col className="d-flex align-items-center justify-content-center p-2" sm={2}>
+                        <XCircle style={{cursor: "pointer"}} onClick={() => deleteFromList(item.id)} />
+                      </Col>
+                    </Row>
+                  )
+                })}
+              </div>
+            }
           </Col>
           <Col lg={{span: 4, offset: 2}}>
-            <AddToList />
+            <AddToList items={items} setItems={setItems} />
           </Col>
         </Row>
       </Container>
